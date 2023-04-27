@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "experimental_quilt_loader_plugin": {
+    "class": "dev.isxander.bundle.entrypoint.BundleLoaderPlugin",
+    "packages": [
+      "dev.isxander.bundle",
+      "dev.isxander.bundle.source",
+      "dev.isxander.bundle.source.modrinth",
+      "dev.isxander.bundle.source.modrinth.response",
+      "dev.isxander.bundle.utils"
+    ]
+  },
+  "quilt_loader": {
+    "group": "dev.isxander",
+    "id": "bundle_updater",
+    "version": "0.1.0",
+    "metadata": {
+      "name": "Bundle Updater",
+      "description": "A mod that provides a Quilt Plugin to automatically load and update mods from '.minecraft/bundle-mods'",
+      "contributors": {
+        "Your name here": "isXander"
+      },
+      "contact": {
+        "homepage": "https://isxander.dev/",
+        "issues": "https://github.com/isXander/Bundle/issues",
+        "sources": "https://github.com/isXander/Bundle"
+      }
+    },
+    "intermediate_mappings": "net.fabricmc:intermediary",
+    "depends": [
+      {
+        "id": "quilt_loader",
+        "versions": ">=0.19.0-beta.13"
+      }
+    ]
+  }
+}
