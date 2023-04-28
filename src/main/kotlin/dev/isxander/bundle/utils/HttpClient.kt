@@ -20,6 +20,9 @@ val httpClient: HttpClient = HttpClient(Java) {
         threadsCount = 4
         pipelining = true
         protocolVersion = java.net.http.HttpClient.Version.HTTP_2
+        config {
+
+        }
     }
 
     install(ContentNegotiation) {

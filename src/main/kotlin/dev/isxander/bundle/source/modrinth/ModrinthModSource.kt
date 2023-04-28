@@ -16,7 +16,7 @@ import org.quiltmc.loader.api.QuiltLoader
 object ModrinthModSource : RemoteModSource {
     override suspend fun bulkGetLatest(local: List<ModMeta>): List<UpdateCandidate> {
         val response = httpClient.post {
-            url(api("version_files/update"))
+            modrinthUrl("version_files/update")
             contentType(ContentType.parse("application/json"))
             setBody(BulkGetLatestVersionsFromHashesRequest(
                 local.map { it.sha512 },
@@ -36,7 +36,10 @@ object ModrinthModSource : RemoteModSource {
         return candidates
     }
 
-    private fun api(path: String): String {
-        return "https://api.modrinth.com/v2/$path"
+    private fun HttpRequestBuilder.modrinthUrl(path: String, block: (URLBuilder).() -> Unit = {}) = url {
+        protocol = URLProtocol.HTTPS
+        host = "api.modrinth.com"
+        path("v2/$path")
+        block(this)
     }
 }

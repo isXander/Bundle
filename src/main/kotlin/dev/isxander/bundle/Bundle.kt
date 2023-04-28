@@ -4,6 +4,7 @@ import com.google.common.hash.Hashing
 import dev.isxander.bundle.source.modrinth.ModrinthModSource
 import dev.isxander.bundle.utils.UpdateCandidate
 import dev.isxander.bundle.utils.logger
+import dev.isxander.bundle.utils.sha512
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -55,7 +56,7 @@ object Bundle {
             getModMeta(mod).let { localMods.add(it) }
         }
 
-        logger.info { "Mod Candidates: " + localMods.joinToString(prefix = "[", postfix = "]") { it.fileName } }
+        logger.info("Mod Candidates: " + localMods.joinToString(prefix = "[", postfix = "]") { it.fileName })
 
         return localMods;
     }
@@ -70,7 +71,7 @@ object Bundle {
     private fun getModMeta(jarPath: Path): ModMeta {
         return ModMeta(
             fileName = jarPath.name,
-            sha512 = com.google.common.io.Files.asByteSource(jarPath.toFile()).hash(Hashing.sha512()).toString(),
+            sha512 = sha512(jarPath),
         )
     }
 
@@ -83,10 +84,12 @@ object Bundle {
                 val updated = BUNDLE_MOD_FOLDER.resolve(remote.fileName)
 
                 logger.info("Downloading: ${remote.fileName}")
-                remote.download()?.let {
-                    Files.write(updated, it, StandardOpenOption.CREATE_NEW)
-                    Files.delete(current)
-                    logger.info("Downloaded: ${remote.fileName}")
+                remote.download()
+                    ?.takeIf { sha512(it) == remote.sha512 }
+                    ?.let {
+                        Files.write(updated, it, StandardOpenOption.CREATE_NEW)
+                        Files.delete(current)
+                        logger.info("Downloaded: ${remote.fileName}")
                 } ?: logger.error("Failed to download: ${remote.fileName}")
             }}.awaitAll()
         }

@@ -1,5 +1,5 @@
 package dev.isxander.bundle.utils
 
-import io.github.oshai.KotlinLogging
+import org.slf4j.LoggerFactory
 
-val logger = KotlinLogging.logger("Bundle")
+val logger = LoggerFactory.getLogger("Bundle")
