@@ -1,6 +1,8 @@
 package dev.isxander.bundle
 
-import com.google.common.hash.Hashing
+import dev.isxander.bundle.gui.LoadingGui
+import dev.isxander.bundle.mod.Mod
+import dev.isxander.bundle.mod.ModFile
 import dev.isxander.bundle.source.modrinth.ModrinthModSource
 import dev.isxander.bundle.utils.UpdateCandidate
 import dev.isxander.bundle.utils.logger
@@ -10,13 +12,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.quiltmc.loader.api.QuiltLoader
-import org.quiltmc.loader.impl.fabric.metadata.FabricModMetadataReader
-import org.quiltmc.loader.impl.metadata.FabricLoaderModMetadata
-import org.quiltmc.loader.impl.metadata.qmj.ModMetadataReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.zip.ZipFile
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.extension
 import kotlin.io.path.name
@@ -46,52 +44,65 @@ object Bundle {
     }
 
     @OptIn(ExperimentalPathApi::class)
-    private fun discoverMods(): List<ModMeta> {
+    private suspend fun discoverMods(): List<Mod> {
         logger.info("Discovering mods...")
 
-        val localMods = mutableListOf<ModMeta>()
+        val localMods = mutableListOf<Mod>()
         for (mod in BUNDLE_MOD_FOLDER.walk()) {
             if (mod.extension == "disabled") continue
+            if (mod.name.startsWith(".")) continue
 
-            getModMeta(mod).let { localMods.add(it) }
+            getMod(mod).let { localMods.add(it) }
         }
 
-        logger.info("Mod Candidates: " + localMods.joinToString(prefix = "[", postfix = "]") { it.fileName })
+        ModrinthModSource.bulkFillMeta(localMods)
+
+        logger.info("Mod Candidates: " + localMods.joinToString(prefix = "[", postfix = "]") { it.meta?.name ?: it.file.fileName })
 
         return localMods;
     }
 
-    private suspend fun getOutdatedMods(mods: List<ModMeta>): List<UpdateCandidate> {
+    private suspend fun getOutdatedMods(mods: List<Mod>): List<UpdateCandidate> {
         logger.info("Getting outdated mods...")
 
         return ModrinthModSource.bulkGetLatest(mods)
-            .filter { it.remote.sha512 != it.local.sha512 }
+            .filter { it.remote.file.sha512 != it.local.file.sha512 }
     }
 
-    private fun getModMeta(jarPath: Path): ModMeta {
-        return ModMeta(
-            fileName = jarPath.name,
-            sha512 = sha512(jarPath),
+    private fun getMod(jarPath: Path): Mod {
+        return Mod(
+            ModFile(
+                jarPath.name,
+                sha512(jarPath),
+                Files.size(jarPath)
+            ),
+            null
         )
     }
 
     private suspend fun updateMods(mods: List<UpdateCandidate>) {
         logger.info("Updating Mods...")
 
-        coroutineScope {
-            mods.map { (local, remote) -> async {
-                val current = BUNDLE_MOD_FOLDER.resolve(local.fileName)
-                val updated = BUNDLE_MOD_FOLDER.resolve(remote.fileName)
+        val loadingGui = LoadingGui()
+        loadingGui.startDownload(mods.sumOf { it.remote.file.size })
+        loadingGui.isVisible = true
 
-                logger.info("Downloading: ${remote.fileName}")
-                remote.download()
-                    ?.takeIf { sha512(it) == remote.sha512 }
+        coroutineScope {
+            mods.mapIndexed { index, (local, remote) -> async {
+                val current = BUNDLE_MOD_FOLDER.resolve(local.file.fileName)
+                val updated = BUNDLE_MOD_FOLDER.resolve(remote.file.fileName)
+
+                logger.info("Downloading: ${remote.file.fileName}")
+                remote.file.download { bytesSent, _ -> loadingGui.setModProgress(index, bytesSent) }
+                    ?.takeIf { sha512(it) == remote.file.sha512 }
                     ?.let {
                         Files.write(updated, it, StandardOpenOption.CREATE_NEW)
                         Files.delete(current)
-                        logger.info("Downloaded: ${remote.fileName}")
-                } ?: logger.error("Failed to download: ${remote.fileName}")
+                        logger.info("Downloaded: ${remote.file.fileName}")
+                } ?: logger.error("Failed to download: ${remote.file.fileName}")
             }}.awaitAll()
         }
+
+        loadingGui.dispose()
     }
 }

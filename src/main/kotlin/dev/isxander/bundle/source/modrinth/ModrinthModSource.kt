@@ -1,26 +1,66 @@
 package dev.isxander.bundle.source.modrinth
 
-import dev.isxander.bundle.ModMeta
-import dev.isxander.bundle.source.RemoteModMeta
+import dev.isxander.bundle.mod.Mod
+import dev.isxander.bundle.mod.ModMeta
 import dev.isxander.bundle.source.RemoteModSource
 import dev.isxander.bundle.source.modrinth.request.BulkGetLatestVersionsFromHashesRequest
+import dev.isxander.bundle.source.modrinth.request.BulkGetVersionsFromHashesRequest
+import dev.isxander.bundle.source.modrinth.request.HashAlgorithm
 import dev.isxander.bundle.source.modrinth.response.BulkGetLatestVersionsFromHashesResponse
-import dev.isxander.bundle.source.modrinth.response.ModVersionResponse
+import dev.isxander.bundle.source.modrinth.response.BulkGetProjectsResponse
+import dev.isxander.bundle.source.modrinth.response.BulkGetVersionsFromHashesResponse
 import dev.isxander.bundle.utils.UpdateCandidate
 import dev.isxander.bundle.utils.httpClient
+import dev.isxander.bundle.utils.logger
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import org.quiltmc.loader.api.QuiltLoader
+import org.quiltmc.loader.api.Version
 
 object ModrinthModSource : RemoteModSource {
-    override suspend fun bulkGetLatest(local: List<ModMeta>): List<UpdateCandidate> {
+    suspend fun bulkFillMeta(mods: List<Mod>) {
+        logger.info("Getting mod metadata from Modrinth...")
+
+        // first get current versions from hashes
+        val versionsResponse = httpClient.post {
+            modrinthUrl("version_files")
+            contentType(ContentType.parse("application/json"))
+            setBody(BulkGetVersionsFromHashesRequest(
+                mods.map { it.file.sha512 },
+                HashAlgorithm.SHA512
+            ))
+        }.body<BulkGetVersionsFromHashesResponse>()
+
+        // then map project id to mod
+        val projectIds = versionsResponse
+            .mapValues { it.value.projectId }
+            .mapKeys { (k, _) -> mods.find { it.file.sha512 == k } ?: error("API didn't return all files") }
+            .entries.associate { (k, v) -> v to k }
+
+        // then get projects from api
+        val projectsResponse = httpClient.get {
+            modrinthUrl("projects") {
+                parameters["ids"] = projectIds.keys.joinToString(",", prefix = "[", postfix = "]") { "\"$it\"" }
+            }
+        }.body<BulkGetProjectsResponse>()
+
+        // add meta to mods
+        for (project in projectsResponse) {
+            val mod = projectIds[project.id] ?: continue
+            mod.meta = ModMeta(project.title, Version.of(versionsResponse[mod.file.sha512]!!.versionNumber))
+        }
+    }
+
+    override suspend fun bulkGetLatest(local: List<Mod>): List<UpdateCandidate> {
+        logger.info("Getting latest versions from Modrinth...")
+
         val response = httpClient.post {
             modrinthUrl("version_files/update")
             contentType(ContentType.parse("application/json"))
             setBody(BulkGetLatestVersionsFromHashesRequest(
-                local.map { it.sha512 },
-                BulkGetLatestVersionsFromHashesRequest.HashAlgorithm.SHA512,
+                local.map { it.file.sha512 },
+                HashAlgorithm.SHA512,
                 listOf("fabric", "quilt"),
                 listOf(QuiltLoader.getRawGameVersion()),
             ))
@@ -28,8 +68,8 @@ object ModrinthModSource : RemoteModSource {
 
         val candidates = mutableListOf<UpdateCandidate>()
         for (localMod in local) {
-            val remoteModUpdate = response[localMod.sha512] ?: continue
-            val remoteMod = remoteModUpdate.asModMeta()
+            val remoteModUpdate = response[localMod.file.sha512] ?: continue
+            val remoteMod = remoteModUpdate.asMod()
             candidates.add(UpdateCandidate(localMod, remoteMod))
         }
 

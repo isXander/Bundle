@@ -1,6 +1,5 @@
 package dev.isxander.bundle.utils
 
-import dev.isxander.bundle.ModMeta
-import dev.isxander.bundle.source.RemoteModMeta
+import dev.isxander.bundle.mod.Mod
 
-data class UpdateCandidate(val local: ModMeta, val remote: RemoteModMeta)
+data class UpdateCandidate(val local: Mod, val remote: Mod)
