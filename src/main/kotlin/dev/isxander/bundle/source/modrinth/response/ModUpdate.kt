@@ -1,8 +1,10 @@
 package dev.isxander.bundle.source.modrinth.response
 
 import dev.isxander.bundle.mod.Mod
+import dev.isxander.bundle.mod.ModMeta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.quiltmc.loader.api.Version
 
 @Serializable
 data class ModUpdate(
@@ -12,10 +14,13 @@ data class ModUpdate(
     val files: List<ModFile>,
     @SerialName("version_type") val versionType: VersionType
 ) {
-    fun asMod(): Mod {
+    fun asMod(localMod: Mod): Mod {
         return Mod(
             files.first().asModFile(),
-            null
+            ModMeta(
+                localMod.meta?.name ?: localMod.file.fileName,
+                Version.of(versionNumber)
+            )
         )
     }
 }

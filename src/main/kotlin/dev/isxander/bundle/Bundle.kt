@@ -1,5 +1,6 @@
 package dev.isxander.bundle
 
+import dev.isxander.bundle.config.BundleConfig
 import dev.isxander.bundle.gui.LoadingGui
 import dev.isxander.bundle.mod.Mod
 import dev.isxander.bundle.mod.ModFile
@@ -7,10 +8,7 @@ import dev.isxander.bundle.source.modrinth.ModrinthModSource
 import dev.isxander.bundle.utils.UpdateCandidate
 import dev.isxander.bundle.utils.logger
 import dev.isxander.bundle.utils.sha512
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.quiltmc.loader.api.QuiltLoader
 import java.nio.file.Files
 import java.nio.file.Path
@@ -67,6 +65,11 @@ object Bundle {
 
         return ModrinthModSource.bulkGetLatest(mods)
             .filter { it.remote.file.sha512 != it.local.file.sha512 }
+            .also {
+                for ((local, remote) in it) {
+                    logger.info("Outdated: ${local.meta?.name ?: local.file.fileName} (${local.meta?.version ?: "unknown version"} -> ${remote.meta?.version ?: "unknown version"})")
+                }
+            }
     }
 
     private fun getMod(jarPath: Path): Mod {
@@ -88,7 +91,7 @@ object Bundle {
         loadingGui.isVisible = true
 
         coroutineScope {
-            mods.mapIndexed { index, (local, remote) -> async {
+            mods.mapIndexed { index, (local, remote) -> async(start = CoroutineStart.LAZY) { // w/o lazy, all will start downloading without even calling awaitAll
                 val current = BUNDLE_MOD_FOLDER.resolve(local.file.fileName)
                 val updated = BUNDLE_MOD_FOLDER.resolve(remote.file.fileName)
 
@@ -100,7 +103,9 @@ object Bundle {
                         Files.delete(current)
                         logger.info("Downloaded: ${remote.file.fileName}")
                 } ?: logger.error("Failed to download: ${remote.file.fileName}")
-            }}.awaitAll()
+            }}
+                .chunked(BundleConfig.downloadThreads) // allow 2 downloads at a time
+                .forEach { it.awaitAll() }
         }
 
         loadingGui.dispose()

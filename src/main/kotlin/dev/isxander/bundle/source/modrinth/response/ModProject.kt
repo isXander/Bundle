@@ -8,5 +8,5 @@ data class ModProject(
     val id: String,
     val title: String,
     val slug: String,
-    @SerialName("icon_url") val iconUrl: String,
+    @SerialName("icon_url") val iconUrl: String?,
 )

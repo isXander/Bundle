@@ -69,7 +69,7 @@ object ModrinthModSource : RemoteModSource {
         val candidates = mutableListOf<UpdateCandidate>()
         for (localMod in local) {
             val remoteModUpdate = response[localMod.file.sha512] ?: continue
-            val remoteMod = remoteModUpdate.asMod()
+            val remoteMod = remoteModUpdate.asMod(localMod)
             candidates.add(UpdateCandidate(localMod, remoteMod))
         }
 
