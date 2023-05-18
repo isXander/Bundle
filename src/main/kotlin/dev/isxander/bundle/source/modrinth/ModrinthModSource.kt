@@ -1,5 +1,7 @@
 package dev.isxander.bundle.source.modrinth
 
+import dev.isxander.bundle.Bundle
+import dev.isxander.bundle.ctx.Version
 import dev.isxander.bundle.mod.Mod
 import dev.isxander.bundle.mod.ModMeta
 import dev.isxander.bundle.source.RemoteModSource
@@ -15,8 +17,6 @@ import dev.isxander.bundle.utils.logger
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import org.quiltmc.loader.api.QuiltLoader
-import org.quiltmc.loader.api.Version
 
 object ModrinthModSource : RemoteModSource {
     suspend fun bulkFillMeta(mods: List<Mod>) {
@@ -62,7 +62,7 @@ object ModrinthModSource : RemoteModSource {
                 local.map { it.file.sha512 },
                 HashAlgorithm.SHA512,
                 listOf("fabric", "quilt"),
-                listOf(QuiltLoader.getRawGameVersion()),
+                listOf(Bundle.LOADER_CTX.gameVersion),
             ))
         }.body<BulkGetLatestVersionsFromHashesResponse>()
 

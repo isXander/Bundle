@@ -1,10 +1,10 @@
 package dev.isxander.bundle.source.modrinth.response
 
+import dev.isxander.bundle.ctx.Version
 import dev.isxander.bundle.mod.Mod
 import dev.isxander.bundle.mod.ModMeta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.quiltmc.loader.api.Version
 
 @Serializable
 data class ModUpdate(

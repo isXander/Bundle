@@ -1,8 +1,8 @@
 package dev.isxander.bundle.config
 
+import dev.isxander.bundle.Bundle
 import org.quiltmc.json5.JsonReader
 import org.quiltmc.json5.JsonWriter
-import org.quiltmc.loader.api.QuiltLoader
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -21,7 +21,7 @@ object BundleConfig {
     )
 
     fun load() {
-        val reader = JsonReader.json5(QuiltLoader.getConfigDir().resolve("bundle.json5"))
+        val reader = JsonReader.json5(Bundle.LOADER_CTX.configDir.resolve("bundle.json5"))
         reader.beginObject()
         while (reader.hasNext()) {
             val name = reader.nextName()
@@ -36,7 +36,7 @@ object BundleConfig {
     }
 
     fun save() {
-        val writer = JsonWriter.json5(QuiltLoader.getConfigDir().resolve("bundle.json5"))
+        val writer = JsonWriter.json5(Bundle.LOADER_CTX.configDir.resolve("bundle.json5"))
         writer.beginObject()
         for (option in options) {
             option.comment?.let { writer.comment(it) }

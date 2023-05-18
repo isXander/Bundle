@@ -1,6 +1,6 @@
 package dev.isxander.bundle.mod
 
-import org.quiltmc.loader.api.Version
+import dev.isxander.bundle.ctx.Version
 
 data class ModMeta(
     val name: String,

@@ -1,6 +1,7 @@
 package dev.isxander.bundle
 
 import dev.isxander.bundle.config.BundleConfig
+import dev.isxander.bundle.ctx.BundleContext
 import dev.isxander.bundle.gui.LoadingGui
 import dev.isxander.bundle.mod.Mod
 import dev.isxander.bundle.mod.ModFile
@@ -9,17 +10,16 @@ import dev.isxander.bundle.utils.UpdateCandidate
 import dev.isxander.bundle.utils.logger
 import dev.isxander.bundle.utils.sha512
 import kotlinx.coroutines.*
-import org.quiltmc.loader.api.QuiltLoader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.extension
-import kotlin.io.path.name
-import kotlin.io.path.walk
+import kotlin.io.path.*
 
 object Bundle {
-    val BUNDLE_MOD_FOLDER: Path = QuiltLoader.getGameDir().resolve("bundle-mods")
+    lateinit var LOADER_CTX: BundleContext
+
+    val BUNDLE_MOD_FOLDER: Path by lazy { LOADER_CTX.gameDir.resolve("bundle-mods") }
+    val BACKUP_MOD_FOLDER: Path by lazy { LOADER_CTX.gameDir.resolve("bundle-mods-backup") }
 
     fun startBlocking() {
         runBlocking { start() }
@@ -30,6 +30,12 @@ object Bundle {
 
         if (!Files.exists(BUNDLE_MOD_FOLDER)) {
             Files.createDirectory(BUNDLE_MOD_FOLDER)
+        }
+
+        if (hasBackupLockFile()) {
+            logger.info("Backup lock file found, skipping update and restoring original state...")
+            restoreModBackup()
+            return
         }
 
         val outdatedMods = getOutdatedMods(discoverMods())
@@ -86,6 +92,8 @@ object Bundle {
     private suspend fun updateMods(mods: List<UpdateCandidate>) {
         logger.info("Updating Mods...")
 
+        backupModFolder()
+
         val loadingGui = LoadingGui()
         loadingGui.startDownload(mods.sumOf { it.remote.file.size })
         loadingGui.isVisible = true
@@ -109,5 +117,59 @@ object Bundle {
         }
 
         loadingGui.dispose()
+    }
+
+    @OptIn(ExperimentalPathApi::class)
+    fun onLoad(success: Boolean) {
+        if (success) {
+            if (hasBackupLockFile())
+                BACKUP_MOD_FOLDER.deleteRecursively()
+        } else {
+            logger.warn("Loader failure detected. Restoring to mods before auto-update...")
+            //restoreModBackup()
+        }
+    }
+
+    @OptIn(ExperimentalPathApi::class)
+    private fun backupModFolder() {
+        logger.info("Backing up Mod Folder...")
+
+        if (hasBackupLockFile()) error("Backup lock file exists! Cannot backup with previous failure.")
+        if (BACKUP_MOD_FOLDER.exists())
+            BACKUP_MOD_FOLDER.deleteRecursively()
+
+        BUNDLE_MOD_FOLDER.copyToRecursively(
+            target = BACKUP_MOD_FOLDER,
+            overwrite = false,
+            followLinks = true
+        )
+
+        Files.createFile(BACKUP_MOD_FOLDER.resolve(".lock"))
+    }
+
+    @OptIn(ExperimentalPathApi::class)
+    private fun restoreModBackup() {
+        logger.info("Restoring Mod Backup...")
+
+        BUNDLE_MOD_FOLDER.deleteRecursively()
+
+        // must delete before copying, as quilt loader opens all files in mod folder and does not close them
+        Files.deleteIfExists(BACKUP_MOD_FOLDER.resolve(".lock"))
+
+        try {
+            BACKUP_MOD_FOLDER.copyToRecursively(
+                target = BUNDLE_MOD_FOLDER,
+                overwrite = false,
+                followLinks = true
+            )
+            BACKUP_MOD_FOLDER.deleteRecursively()
+        } catch (e: Exception) {
+            Files.createDirectory(BACKUP_MOD_FOLDER)
+            Files.createFile(BACKUP_MOD_FOLDER.resolve(".lock"))
+        }
+    }
+
+    private fun hasBackupLockFile(): Boolean {
+        return Files.exists(BACKUP_MOD_FOLDER.resolve(".lock"))
     }
 }

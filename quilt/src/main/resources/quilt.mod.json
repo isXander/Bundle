@@ -1,10 +1,14 @@
 {
   "schema_version": 1,
   "experimental_quilt_loader_plugin": {
-    "class": "dev.isxander.bundle.entrypoint.BundleLoaderPlugin",
+    "class": "dev.isxander.bundle.quilt.BundleLoaderPlugin",
     "packages": [
       "dev.isxander.bundle",
-      "dev.isxander.bundle.entrypoint",
+      "dev.isxander.bundle.config",
+      "dev.isxander.bundle.gui",
+      "dev.isxander.bundle.ctx",
+      "dev.isxander.bundle.mod",
+      "dev.isxander.bundle.quilt",
       "dev.isxander.bundle.source",
       "dev.isxander.bundle.source.modrinth",
       "dev.isxander.bundle.source.modrinth.response",

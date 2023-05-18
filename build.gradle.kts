@@ -2,33 +2,24 @@ plugins {
     kotlin("jvm") version "1.8.20"
     kotlin("plugin.serialization") version "1.8.20"
     id("com.github.johnrengelman.shadow") version "7.1.0"
-    id("org.quiltmc.loom") version "1.+"
 }
 
-group = "dev.isxander"
-version = "0.1.0"
+allprojects {
+    group = "dev.isxander"
+    version = "0.1.0"
 
-loom {
-    runs {
-        named("client") {
-            vmArg("-Dloader.experimental.allow_loading_plugins=true")
-        }
+    repositories {
+        mavenCentral()
+        maven("https://maven.quiltmc.org/repository/release/")
     }
-}
-
-repositories {
-    mavenCentral()
-    maven("https://maven.quiltmc.org/repository/release/")
 }
 
 val shade: Configuration by configurations.creating
 
 dependencies {
-    minecraft("com.mojang:minecraft:1.19.4")
-    mappings(loom.officialMojangMappings())
-
-    modImplementation("org.quiltmc:quilt-loader:0.19.0-beta.13")
     implementation("org.quiltmc:quilt-json5:1.0.3")
+    implementation("org.slf4j:slf4j-api:1.7.32")
+    implementation("com.google.guava:guava:31.1-jre")
 
     listOf(
         "org.jetbrains.kotlin:kotlin-stdlib:1.8.21",
@@ -64,8 +55,8 @@ dependencies {
         "io.ktor:ktor-serialization-kotlinx:2.3.0",
         "io.ktor:ktor-serialization-kotlinx-jvm:2.3.0",
     ).forEach {
-        include(it)
-        modApi(it) { isTransitive = false }
+        shade(it)
+        api(it) { isTransitive = false }
     }
 }
 
@@ -79,7 +70,7 @@ tasks {
     }
 
     shadowJar {
-        archiveClassifier.set("dev-fat")
+        archiveClassifier.set(null as String?)
         configurations = listOf(shade)
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
@@ -88,10 +79,4 @@ tasks {
         relocate("kotlin", "dev.isxander.bundle.libs.kotlin")
     }
 
-    remapJar {
-        inputFile.set(shadowJar.get().archiveFile)
-        dependsOn(shadowJar)
-
-        archiveClassifier.set(null as String?)
-    }
 }
